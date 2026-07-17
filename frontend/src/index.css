@@ -1,0 +1,64 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Custom scrollbar for the industrial theme ──────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #1a2332;
+}
+::-webkit-scrollbar-thumb {
+  background: #2d3a4e;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #3d4a5e;
+}
+
+/* ── Subtle glass-panel effect for cards ────────────────────────── */
+.glass-panel {
+  background: linear-gradient(
+    135deg,
+    rgba(26, 35, 50, 0.85) 0%,
+    rgba(30, 41, 59, 0.75) 100%
+  );
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(45, 58, 78, 0.6);
+}
+
+/* ── Pulsing glow for the CTA button ────────────────────────────── */
+@keyframes pulse-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 8px rgba(14, 165, 233, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 24px rgba(14, 165, 233, 0.6);
+  }
+}
+.btn-cta {
+  animation: pulse-glow 2.5s ease-in-out infinite;
+}
+
+/* ── KPI value transitions ──────────────────────────────────────── */
+.kpi-value {
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ── Fade-in animation for feed items ───────────────────────────── */
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.feed-item {
+  animation: fade-in-up 0.3s ease-out forwards;
+}

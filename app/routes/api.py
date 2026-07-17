@@ -8,8 +8,9 @@ from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import PlainTextResponse
 
 from app.models.database import FACTORY_CATALOGUE
-from app.models.schemas import CircularUploadRequest
+from app.models.schemas import CircularUploadRequest, OptimizeScheduleRequest
 from app.services.rag_pipeline import RAGPipelineError, run_rag_pipeline
+from app.services.optimizer import compute_optimization
 from app.utils.mock_data_generator import get_mock_public_circular
 
 logger = logging.getLogger(__name__)
@@ -85,3 +86,29 @@ async def upload_circular(payload: CircularUploadRequest):
         ) from exc
 
     return priority_index.model_dump()
+
+
+@router.post("/optimize-schedule", status_code=status.HTTP_200_OK)
+async def optimize_schedule(payload: OptimizeScheduleRequest):
+    """
+    Execute the AI line-balancing optimisation engine.
+
+    Accepts a list of validated shortage items from the RAG pipeline and
+    returns a per-line before/after allocation breakdown with aggregate
+    financial impact metrics.
+
+    The mathematical formula applied per shortage target:
+        Optimized Boxes = Min(Remaining Factory Capacity, National Deficit Volume)
+        Marginal Revenue = Optimized Boxes × Internal Margin Per Box
+    """
+    if not payload.shortages:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="shortages list must not be empty.",
+        )
+
+    shortage_dicts = [s.model_dump() for s in payload.shortages]
+    # compute_optimization has its own internal try/except that falls back
+    # to hardcoded mock data — the UI never sees an error screen.
+    result = compute_optimization(shortage_dicts)
+    return result
