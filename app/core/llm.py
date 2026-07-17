@@ -131,7 +131,7 @@ def _extract_quantities(text: str) -> list[tuple[str, str, int]]:
         name_raw = match.group(1).strip()
         qty = _parse_qty(match.group(2))
         canon = _normalise_name(name_raw)
-        if canon and any(canon == m.molecule_name for m in FACTORY_CATALOGUE):
+        if canon:
             results.append((canon, name_raw, qty))
 
     # Pass 2: postes infructueux
@@ -139,7 +139,7 @@ def _extract_quantities(text: str) -> list[tuple[str, str, int]]:
         name_raw = match.group(1).strip()
         qty = _parse_qty(match.group(2))
         canon = _normalise_name(name_raw)
-        if canon and any(canon == m.molecule_name for m in FACTORY_CATALOGUE):
+        if canon:
             results.append((canon, name_raw, qty))
 
     # Pass 3: generic fallback for any variant mention with a quantity
@@ -150,7 +150,6 @@ def _extract_quantities(text: str) -> list[tuple[str, str, int]]:
             canon = _normalise_name(name_raw)
             if (
                 canon
-                and any(canon == m.molecule_name for m in FACTORY_CATALOGUE)
                 and not any(r[0] == canon and r[1] == name_raw for r in results)  # deduplicate
             ):
                 results.append((canon, name_raw, qty))
