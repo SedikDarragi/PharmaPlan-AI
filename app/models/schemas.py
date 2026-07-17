@@ -29,6 +29,10 @@ class CircularUploadRequest(BaseModel):
     """Payload accepted by the upload-circular endpoint."""
 
     raw_text: str = Field(description="Raw unstructured text from a public circular / PDF bulletin")
+    llm_provider: str = Field(
+        default="",
+        description="LLM provider override: 'mock', 'openai', 'google', 'anthropic'. Empty = use env default.",
+    )
 
 
 class MismatchedTenderOutput(BaseModel):

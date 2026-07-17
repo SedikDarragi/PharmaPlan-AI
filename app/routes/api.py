@@ -70,8 +70,11 @@ async def upload_circular(payload: CircularUploadRequest):
             detail="raw_text must be a non-empty string.",
         )
 
+    # Resolve LLM provider: payload override > env var > default mock
+    provider = payload.llm_provider.strip() or None
+
     try:
-        priority_index = run_rag_pipeline(text)
+        priority_index = run_rag_pipeline(text, provider=provider)
     except RAGPipelineError as exc:
         logger.error("RAG pipeline failed: %s", exc)
         raise HTTPException(

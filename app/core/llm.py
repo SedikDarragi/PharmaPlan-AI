@@ -269,29 +269,215 @@ class MockLLMClient(LLMClient):
 
 class OpenAILLMClient(LLMClient):
     """
-    Real OpenAI integration (requires ``OPENAI_API_KEY`` env var).
-    Not yet implemented — placeholder for future use.
+    Real OpenAI integration using the ``openai`` SDK.
+
+    Reads ``OPENAI_API_KEY`` and ``OPENAI_MODEL`` from ``app.core.settings``
+    (which pulls from the environment / ``.env`` file).
+
+    If the API call fails for any reason, ``parse_circular`` falls back to
+    the ``MockLLMClient`` so the demo never breaks.
     """
 
-    def __init__(self, model: str = "gpt-4o-mini") -> None:
-        self._model = model
-        self._client: Any = None  # openai.OpenAI would be initialised here
+    def __init__(self, model: str | None = None) -> None:
+        from app.core.settings import settings as s
+
+        self._model = model or s.OPENAI_MODEL
+        self._client: Any = None  # lazily initialised
         catalogue_list = [
             {
                 "molecule_name": m.molecule_name,
                 "active_dosage": m.active_dosage,
                 "delivery_form": m.delivery_form,
+                "max_monthly_box_capacity": m.max_monthly_box_capacity,
             }
             for m in FACTORY_CATALOGUE
         ]
         self._system_prompt = _build_system_prompt(json.dumps(catalogue_list, indent=2))
+        self._mock_fallback = MockLLMClient()
+
+    @property
+    def system_prompt(self) -> str:
+        return self._system_prompt
 
     def parse_circular(self, raw_text: str) -> list[dict[str, Any]]:
         """
         Execute the actual OpenAI chat completion.
-        # TODO: implement real API call.
+
+        On any failure (network, auth, rate-limit, malformed response) the
+        method falls back to the deterministic ``MockLLMClient`` so that the
+        dashboard never shows an error screen during a live pitch.
         """
-        raise NotImplementedError("OpenAI client — implement when OPENAI_API_KEY is available.")
+        from app.core.settings import settings as s
+
+        api_key = s.OPENAI_API_KEY
+        if not api_key:
+            import logging
+            logging.getLogger(__name__).warning(
+                "OPENAI_API_KEY not set — falling back to mock LLM."
+            )
+            return self._mock_fallback.parse_circular(raw_text)
+
+        # Lazy client initialisation (avoids importing openai at module level)
+        if self._client is None:
+            from openai import OpenAI
+            self._client = OpenAI(api_key=api_key)
+
+        import logging
+        logger = logging.getLogger(__name__)
+
+        try:
+            logger.info("OpenAI: sending circular (%d chars) to model %s …", len(raw_text), self._model)
+            resp = self._client.chat.completions.create(
+                model=self._model,
+                messages=[
+                    {"role": "system", "content": self._system_prompt},
+                    {"role": "user", "content": raw_text},
+                ],
+                temperature=0.0,  # deterministic output
+                response_format={"type": "json_object"},
+            )
+
+            content = resp.choices[0].message.content
+            if not content:
+                logger.warning("OpenAI returned empty content — falling back to mock.")
+                return self._mock_fallback.parse_circular(raw_text)
+
+            # The system prompt demands a JSON array, but with
+            # response_format="json_object" the model might wrap it in an
+            # object like {"items": [...]}. Handle both cases.
+            import json
+            parsed = json.loads(content)
+            if isinstance(parsed, dict):
+                # Try common wrapper keys
+                for key in ("items", "results", "data", "shortages"):
+                    if key in parsed and isinstance(parsed[key], list):
+                        parsed = parsed[key]
+                        break
+                # If still a dict, wrap it
+                if isinstance(parsed, dict):
+                    parsed = [parsed]
+
+            if not isinstance(parsed, list):
+                logger.warning(
+                    "OpenAI returned unexpected type %s — falling back to mock.",
+                    type(parsed).__name__,
+                )
+                return self._mock_fallback.parse_circular(raw_text)
+
+            logger.info("OpenAI: successfully extracted %d shortage items.", len(parsed))
+            return parsed
+
+        except Exception as exc:
+            logger.exception("OpenAI API call failed (%s) — falling back to mock.", exc)
+            return self._mock_fallback.parse_circular(raw_text)
+
+
+class GoogleLLMClient(LLMClient):
+    """
+    Real Google Gemini integration using the ``google-genai`` SDK.
+
+    Reads ``GEMINI_API_KEY`` and ``GEMINI_MODEL`` from ``app.core.settings``
+    (which pulls from the environment / ``.env`` file).
+
+    Uses ``response_mime_type="application/json"`` for structured JSON output.
+
+    On any failure, falls back to ``MockLLMClient`` so the demo never breaks.
+    """
+
+    def __init__(self, model: str | None = None) -> None:
+        from app.core.settings import settings as s
+
+        self._model = model or s.GEMINI_MODEL
+        self._client: Any = None  # lazily initialised
+        catalogue_list = [
+            {
+                "molecule_name": m.molecule_name,
+                "active_dosage": m.active_dosage,
+                "delivery_form": m.delivery_form,
+                "max_monthly_box_capacity": m.max_monthly_box_capacity,
+            }
+            for m in FACTORY_CATALOGUE
+        ]
+        self._system_prompt = _build_system_prompt(json.dumps(catalogue_list, indent=2))
+        self._mock_fallback = MockLLMClient()
+
+    @property
+    def system_prompt(self) -> str:
+        return self._system_prompt
+
+    def parse_circular(self, raw_text: str) -> list[dict[str, Any]]:
+        """
+        Execute the actual Google Gemini chat completion.
+
+        On any failure (network, auth, rate-limit, malformed response) the
+        method falls back to the deterministic ``MockLLMClient`` so that the
+        dashboard never shows an error screen during a live pitch.
+        """
+        from app.core.settings import settings as s
+
+        api_key = s.GEMINI_API_KEY
+        if not api_key:
+            import logging
+            logging.getLogger(__name__).warning(
+                "GEMINI_API_KEY not set — falling back to mock LLM."
+            )
+            return self._mock_fallback.parse_circular(raw_text)
+
+        # Lazy client initialisation
+        if self._client is None:
+            from google import genai
+            self._client = genai.Client(api_key=api_key)
+
+        from google.genai import types
+        import logging
+        logger = logging.getLogger(__name__)
+
+        try:
+            logger.info(
+                "Gemini: sending circular (%d chars) to model %s …",
+                len(raw_text), self._model,
+            )
+
+            response = self._client.models.generate_content(
+                model=self._model,
+                contents=raw_text,
+                config=types.GenerateContentConfig(
+                    system_instruction=self._system_prompt,
+                    response_mime_type="application/json",
+                    temperature=0.0,
+                ),
+            )
+
+            content = response.text
+            if not content:
+                logger.warning("Gemini returned empty content — falling back to mock.")
+                return self._mock_fallback.parse_circular(raw_text)
+
+            import json
+            parsed = json.loads(content)
+
+            # Handle both JSON array and wrapped-object formats
+            if isinstance(parsed, dict):
+                for key in ("items", "results", "data", "shortages"):
+                    if key in parsed and isinstance(parsed[key], list):
+                        parsed = parsed[key]
+                        break
+                if isinstance(parsed, dict):
+                    parsed = [parsed]
+
+            if not isinstance(parsed, list):
+                logger.warning(
+                    "Gemini returned unexpected type %s — falling back to mock.",
+                    type(parsed).__name__,
+                )
+                return self._mock_fallback.parse_circular(raw_text)
+
+            logger.info("Gemini: successfully extracted %d shortage items.", len(parsed))
+            return parsed
+
+        except Exception as exc:
+            logger.exception("Gemini API call failed (%s) — falling back to mock.", exc)
+            return self._mock_fallback.parse_circular(raw_text)
 
 
 class AnthropicLLMClient(LLMClient):
@@ -325,15 +511,23 @@ class AnthropicLLMClient(LLMClient):
 # Factory
 # ---------------------------------------------------------------------------
 
-def get_llm_client(provider: str = "mock") -> LLMClient:
+def get_llm_client(provider: str | None = None) -> LLMClient:
     """
     Return the appropriate LLM client based on the *provider* string.
 
-    Supported providers: ``"mock"`` (default), ``"openai"``, ``"anthropic"``.
+    If *provider* is ``None``, reads from the ``LLM_PROVIDER`` environment
+    variable (or defaults to ``"mock"``).
+
+    Supported providers: ``"mock"``, ``"openai"``, ``"google"``, ``"anthropic"``.
     """
+    if provider is None:
+        from app.core.settings import settings as s
+        provider = s.LLM_PROVIDER
+
     provider_map: dict[str, type[LLMClient]] = {
         "mock": MockLLMClient,
         "openai": OpenAILLMClient,
+        "google": GoogleLLMClient,
         "anthropic": AnthropicLLMClient,
     }
     cls = provider_map.get(provider)
