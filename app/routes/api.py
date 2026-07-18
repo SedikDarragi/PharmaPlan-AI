@@ -12,6 +12,7 @@ from app.models.schemas import CircularUploadRequest, OptimizeScheduleRequest
 from app.services.rag_pipeline import RAGPipelineError, run_rag_pipeline
 from app.services.optimizer import compute_optimization
 from app.utils.mock_data_generator import get_mock_public_circular
+from app.services.web_scraper import fetch_live_public_circular
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +50,20 @@ async def get_mock_public_circular_endpoint() -> str:
     Use this endpoint during development to feed the Phase-2 RAG pipeline.
     """
     return get_mock_public_circular()
+
+
+@router.get("/live-public-circular", response_class=PlainTextResponse)
+async def get_live_public_circular_endpoint() -> str:
+    """
+    Fetch real drug shortage data from the OpenFDA public API and return
+    it formatted as a bulletin-style text block.
+
+    This endpoint pulls live data from the internet — no mock data involved.
+    If the external API is unreachable, a realistic fallback text is returned
+    so the demo never breaks.
+    """
+    text = await fetch_live_public_circular(max_results=20)
+    return text
 
 
 @router.post("/upload-circular", status_code=status.HTTP_200_OK)

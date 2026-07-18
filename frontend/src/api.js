@@ -50,16 +50,25 @@ export function fetchInventory() {
   return request("/inventory");
 }
 
-/** GET /api/mock-public-circular — messy bulletin text */
+/** GET /api/mock-public-circular — simulated bulletin text */
 export function fetchMockCircular() {
   return request("/mock-public-circular");
 }
 
+/** GET /api/live-public-circular — real data from OpenFDA via web scraper */
+export function fetchLiveCircular() {
+  return request("/live-public-circular");
+}
+
 /** POST /api/upload-circular — run the RAG pipeline */
-export function uploadCircular(rawText) {
+export function uploadCircular(rawText, llmProvider) {
+  const body = { raw_text: rawText };
+  if (llmProvider) {
+    body.llm_provider = llmProvider;
+  }
   return request("/upload-circular", {
     method: "POST",
-    body: JSON.stringify({ raw_text: rawText }),
+    body: JSON.stringify(body),
   });
 }
 

@@ -7,7 +7,15 @@ import BeforeAfterComparison from "./components/BeforeAfterComparison";
 
 /* ── Header ─────────────────────────────────────────────────────────── */
 
-function Header({ onQuickDemo, isDemoRunning }) {
+const PROVIDERS = [
+  { value: "", label: "Env Default" },
+  { value: "mock", label: "Mock" },
+  { value: "google", label: "Google Gemini" },
+  { value: "openai", label: "OpenAI" },
+  { value: "anthropic", label: "Anthropic" },
+];
+
+function Header({ onQuickDemo, isDemoRunning, llmProvider, onProviderChange }) {
   return (
     <header className="flex items-center justify-between px-6 py-4 border-b border-surface-border">
       <div className="flex items-center gap-3">
@@ -27,6 +35,25 @@ function Header({ onQuickDemo, isDemoRunning }) {
       </div>
 
       <div className="flex items-center gap-3">
+        {/* ── LLM Provider Switcher ──────────────────────────────────── */}
+        <div className="flex items-center gap-1.5">
+          <svg className="w-3.5 h-3.5 text-text-dim" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="12" cy="12" r="10" />
+            <path d="M12 6v6l4 2" />
+          </svg>
+          <select
+            value={llmProvider}
+            onChange={(e) => onProviderChange(e.target.value)}
+            className="bg-surface-light/60 border border-surface-border rounded-lg px-2.5 py-1.5 text-xs font-medium text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-primary/40 cursor-pointer hover:border-surface-hover transition-colors"
+          >
+            {PROVIDERS.map((p) => (
+              <option key={p.value} value={p.value}>
+                {p.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
         {/* ── Quick Demo Populate ──────────────────────────────────────── */}
         <button
           onClick={onQuickDemo}
@@ -46,7 +73,7 @@ function Header({ onQuickDemo, isDemoRunning }) {
               <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <polygon points="5 3 19 12 5 21 5 3" />
               </svg>
-              Quick Demo Populate
+              Quick Demo
             </>
           )}
         </button>
@@ -142,6 +169,9 @@ export default function App() {
   const [isOptimized, setIsOptimized] = useState(false);
   const [optimizationResult, setOptimizationResult] = useState(null);
 
+  // LLM Provider (local override for the RAG pipeline)
+  const [llmProvider, setLlmProvider] = useState("");
+
   // Quick Demo
   const [isDemoRunning, setIsDemoRunning] = useState(false);
   const demoInFlight = useRef(false);
@@ -211,8 +241,9 @@ export default function App() {
       // Step 1: Fetch circular
       const text = await fetchMockCircular();
 
-      // Step 2: Process via RAG
-      const ragResult = await uploadCircular(text);
+      // Step 2: Process via RAG (use the selected provider)
+      const provider = llmProvider || undefined;
+      const ragResult = await uploadCircular(text, provider);
       const items = ragResult.items || [];
       setShortages(items);
       setIsOptimized(false);
@@ -242,7 +273,12 @@ export default function App() {
 
   return (
     <div className="min-h-screen flex flex-col bg-surface">
-      <Header onQuickDemo={handleQuickDemo} isDemoRunning={isDemoRunning} />
+      <Header
+        onQuickDemo={handleQuickDemo}
+        isDemoRunning={isDemoRunning}
+        llmProvider={llmProvider}
+        onProviderChange={setLlmProvider}
+      />
 
       <main className="flex-1 px-6 py-5 space-y-5 max-w-7xl mx-auto w-full">
         {/* ── Module A: KPI Impact Cards ──────────────────────────────── */}
@@ -293,7 +329,10 @@ export default function App() {
         />
 
         {/* ── Module C: Live National Deficit Feed ────────────────────── */}
-        <DeficitFeed onShortagesUpdate={handleShortagesUpdate} />
+        <DeficitFeed
+          onShortagesUpdate={handleShortagesUpdate}
+          llmProvider={llmProvider}
+        />
       </main>
 
       <Footer />

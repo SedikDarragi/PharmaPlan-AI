@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { fetchMockCircular, uploadCircular } from "../api";
+import { fetchMockCircular, fetchLiveCircular, uploadCircular } from "../api";
 
 /* ── Priority badge ────────────────────────────────────────────────── */
 
@@ -31,7 +31,6 @@ function ShortageRow({ item, index, moleculeNames }) {
       className="feed-item flex items-center gap-3 rounded-lg bg-surface-light/40 px-4 py-3 transition-colors hover:bg-surface-light/70"
       style={{ animationDelay: `${index * 50}ms` }}
     >
-      {/* Molecule info */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
           <span className="font-semibold text-sm text-text-primary truncate">
@@ -48,15 +47,13 @@ function ShortageRow({ item, index, moleculeNames }) {
         </p>
       </div>
 
-      {/* Deficit volume */}
       <div className="text-right shrink-0">
         <p className="font-mono text-sm font-semibold text-text-primary">
-          {formatNum(item.volume_deficit)}
+          {new Intl.NumberFormat("en-US").format(item.volume_deficit)}
         </p>
         <p className="text-[10px] uppercase tracking-wider text-text-dim">Deficit</p>
       </div>
 
-      {/* Priority */}
       <div className="shrink-0">
         <PriorityBadge score={item.priority_score} />
       </div>
@@ -66,7 +63,7 @@ function ShortageRow({ item, index, moleculeNames }) {
 
 /* ── Feed component ────────────────────────────────────────────────── */
 
-export default function DeficitFeed({ onShortagesUpdate }) {
+export default function DeficitFeed({ onShortagesUpdate, llmProvider }) {
   const [circularText, setCircularText] = useState(null);
   const [shortages, setShortages] = useState([]);
   const [loading, setLoading] = useState({
@@ -75,28 +72,46 @@ export default function DeficitFeed({ onShortagesUpdate }) {
   });
   const [error, setError] = useState(null);
   const [moleculeNames, setMoleculeNames] = useState([]);
+  const [dataSource, setDataSource] = useState(null); // "mock" | "live"
 
-  /* ── Step 1: Fetch the mock circular ─────────────────────────────── */
-  const handleFetchCircular = async () => {
+  /* ── Fetch mock circular ─────────────────────────────────────────── */
+  const handleFetchMock = async () => {
     setLoading((prev) => ({ ...prev, fetch: true }));
+    setDataSource("mock");
     setError(null);
     try {
       const text = await fetchMockCircular();
       setCircularText(text);
     } catch (err) {
-      setError(err.message || "Failed to fetch circular.");
+      setError(err.message || "Failed to fetch mock circular.");
     } finally {
       setLoading((prev) => ({ ...prev, fetch: false }));
     }
   };
 
-  /* ── Step 2: Process via RAG pipeline ─────────────────────────────── */
+  /* ── Fetch live circular from OpenFDA ─────────────────────────────── */
+  const handleFetchLive = async () => {
+    setLoading((prev) => ({ ...prev, fetch: true }));
+    setDataSource("live");
+    setError(null);
+    try {
+      const text = await fetchLiveCircular();
+      setCircularText(text);
+    } catch (err) {
+      setError(err.message || "Failed to fetch live data.");
+    } finally {
+      setLoading((prev) => ({ ...prev, fetch: false }));
+    }
+  };
+
+  /* ── Process via RAG pipeline ─────────────────────────────────────── */
   const handleProcessCircular = async () => {
     if (!circularText) return;
     setLoading((prev) => ({ ...prev, process: true }));
     setError(null);
     try {
-      const result = await uploadCircular(circularText);
+      const provider = llmProvider || undefined;
+      const result = await uploadCircular(circularText, provider);
       const items = result.items || [];
       setShortages(items);
       setMoleculeNames(items.map((i) => i.molecule_key));
@@ -108,11 +123,12 @@ export default function DeficitFeed({ onShortagesUpdate }) {
     }
   };
 
-  /* ── Step 3: Clear results ────────────────────────────────────────── */
+  /* ── Clear ────────────────────────────────────────────────────────── */
   const handleClear = () => {
     setCircularText(null);
     setShortages([]);
     setError(null);
+    setDataSource(null);
     if (onShortagesUpdate) onShortagesUpdate([]);
   };
 
@@ -129,13 +145,13 @@ export default function DeficitFeed({ onShortagesUpdate }) {
         </h2>
 
         <div className="flex items-center gap-2">
-          {/* Fetch button */}
+          {/* Fetch Mock button */}
           <button
-            onClick={handleFetchCircular}
+            onClick={handleFetchMock}
             disabled={isProcessing}
             className="inline-flex items-center gap-1.5 rounded-lg bg-accent-primary/15 px-3 py-1.5 text-xs font-medium text-accent-primary transition-all hover:bg-accent-primary/25 disabled:opacity-40"
           >
-            {loading.fetch ? (
+            {loading.fetch && dataSource !== "live" ? (
               <>
                 <svg className="animate-spin w-3.5 h-3.5" viewBox="0 0 24 24" fill="none">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
@@ -144,7 +160,38 @@ export default function DeficitFeed({ onShortagesUpdate }) {
                 Fetching…
               </>
             ) : (
-              "Fetch Circular"
+              <>
+                <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M21 12a9 9 0 1 1-9-9" />
+                  <path d="M21 3v6h-6" />
+                </svg>
+                Mock Data
+              </>
+            )}
+          </button>
+
+          {/* Fetch Live button */}
+          <button
+            onClick={handleFetchLive}
+            disabled={isProcessing}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-900/30 px-3 py-1.5 text-xs font-medium text-emerald-400 transition-all hover:bg-emerald-900/50 disabled:opacity-40"
+          >
+            {loading.fetch && dataSource === "live" ? (
+              <>
+                <svg className="animate-spin w-3.5 h-3.5" viewBox="0 0 24 24" fill="none">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                </svg>
+                Fetching…
+              </>
+            ) : (
+              <>
+                <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="12" cy="12" r="10" />
+                  <polyline points="2 12 7 12 9 15 15 9 17 12 22 12" />
+                </svg>
+                Live Data
+              </>
             )}
           </button>
 
@@ -169,6 +216,13 @@ export default function DeficitFeed({ onShortagesUpdate }) {
             </button>
           )}
 
+          {/* Active provider badge */}
+          {hasCircular && llmProvider && (
+            <span className="text-[10px] uppercase tracking-wider text-accent-primary bg-accent-primary/10 px-2 py-1 rounded">
+              {llmProvider}
+            </span>
+          )}
+
           {/* Clear button */}
           {hasResults && (
             <button
@@ -183,14 +237,12 @@ export default function DeficitFeed({ onShortagesUpdate }) {
 
       {/* Body */}
       <div className="p-5">
-        {/* Error */}
         {error && (
           <div className="mb-4 rounded-lg bg-red-900/20 border border-red-800/40 px-4 py-3 text-sm text-red-400">
             ⚠ {error}
           </div>
         )}
 
-        {/* Status: nothing loaded */}
         {!hasCircular && !error && (
           <div className="py-12 text-center text-text-dim">
             <svg className="mx-auto w-10 h-10 mb-3 opacity-40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -199,16 +251,26 @@ export default function DeficitFeed({ onShortagesUpdate }) {
               <line x1="16" y1="13" x2="8" y2="13" />
               <line x1="16" y1="17" x2="8" y2="17" />
             </svg>
-            <p className="text-sm">Click <strong>Fetch Circular</strong> to load a mock public bulletin</p>
-            <p className="text-xs mt-1">Then submit to the RAG engine to extract shortage opportunities</p>
+            <p className="text-sm">
+              Click <strong>Mock Data</strong> for a simulated bulletin, or{" "}
+              <strong>Live Data</strong> to fetch real shortages from OpenFDA
+            </p>
+            <p className="text-xs mt-1">
+              Then submit to the RAG engine to extract opportunities
+            </p>
           </div>
         )}
 
-        {/* Circular preview */}
         {hasCircular && !hasResults && (
           <div className="mb-4">
             <p className="text-xs text-text-dim mb-2">
-              Circular fetched ({circularText.length.toLocaleString()} chars) — ready to process:
+              <span
+                className={`inline-block w-2 h-2 rounded-full mr-1 ${
+                  dataSource === "live" ? "bg-emerald-400" : "bg-accent-primary"
+                }`}
+              />
+              {dataSource === "live" ? "Live" : "Mock"} circular fetched (
+              {circularText.length.toLocaleString()} chars) — ready to process:
             </p>
             <pre className="max-h-40 overflow-y-auto rounded-lg bg-surface/60 p-3 text-[11px] leading-relaxed text-text-dim font-mono whitespace-pre-wrap border border-surface-border">
               {circularText.slice(0, 1500)}
@@ -219,12 +281,14 @@ export default function DeficitFeed({ onShortagesUpdate }) {
           </div>
         )}
 
-        {/* Results */}
         {hasResults && (
           <div className="space-y-2">
             <div className="flex items-center justify-between mb-1">
               <p className="text-xs text-text-dim">
                 {shortages.length} shortage{shortages.length !== 1 ? "s" : ""} identified
+                {dataSource === "live" && (
+                  <span className="ml-2 text-emerald-400">via live data</span>
+                )}
               </p>
             </div>
             {shortages.map((item, i) => (
