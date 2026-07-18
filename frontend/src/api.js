@@ -79,3 +79,20 @@ export function optimizeSchedule(shortages) {
     body: JSON.stringify({ shortages }),
   });
 }
+
+/** POST /api/sync-live-pct — trigger PCT live sync */
+export function syncPctFeeds({ autoProcess = false, llmProvider } = {}) {
+  const body = { auto_process: autoProcess };
+  if (llmProvider) {
+    body.llm_provider = llmProvider;
+  }
+  return request("/sync-live-pct", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+/** GET /api/pct-cache — inspect cached PCT data */
+export function fetchPctCache() {
+  return request("/pct-cache");
+}

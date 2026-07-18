@@ -80,3 +80,59 @@ class OptimizationResponse(BaseModel):
         "overall_capacity_load_before (%), overall_capacity_load_after (%), "
         "total_shortage_matches"
     )
+
+
+# ── Phase 5 – PCT Live Sync schemas ──────────────────────────────────────────
+
+
+class PCTSyncRequest(BaseModel):
+    """Payload for triggering a PCT (Pharmacie Centrale de Tunisie) live sync."""
+
+    auto_process: bool = Field(
+        default=False,
+        description="If true, the scraped bulletin is automatically submitted to the RAG pipeline "
+        "and the shortage results are returned alongside the sync metadata.",
+    )
+    llm_provider: str = Field(
+        default="",
+        description="LLM provider override for RAG processing (only used when auto_process=True). "
+        "Empty = use env default.",
+    )
+
+
+class PCTCacheEntry(BaseModel):
+    """A single entry in the PCT cache (circular or tender metadata)."""
+
+    title: str = Field(description="Document title")
+    url: str = Field(description="Document URL (may be a PDF link)")
+    date: str = Field(default="", description="Publication or issue date")
+    reference: str = Field(default="", description="Reference number")
+    type: str = Field(description="'circular' or 'tender'")
+
+
+class PCTSyncResponse(BaseModel):
+    """Response payload returned from a PCT live sync operation."""
+
+    status: str = Field(description="Sync status: 'live', 'cached', or 'fallback'")
+    timestamp: str = Field(description="ISO-8601 timestamp of the sync")
+    source: str = Field(description="Human-readable data source description")
+    circulars_count: int = Field(description="Number of circulars found")
+    tenders_count: int = Field(description="Number of tenders found")
+    circular_text_size: int = Field(description="Size in chars of extracted circular PDF text")
+    tender_text_size: int = Field(description="Size in chars of extracted tender PDF text")
+    pct_bulletin_text: str = Field(description="Formatted PCT bulletin text ready for the RAG pipeline")
+    rag_results: list[dict] | None = Field(
+        default=None,
+        description="RAG pipeline results if auto_process=True, else null",
+    )
+    message: str = Field(description="Human-readable status message")
+
+
+class PCTCacheInfo(BaseModel):
+    """Information about the current PCT in-memory cache."""
+
+    last_sync: str | None = Field(description="ISO-8601 timestamp of last sync, or null if never synced")
+    circulars: list[PCTCacheEntry] = Field(description="Cached circulars")
+    tenders: list[PCTCacheEntry] = Field(description="Cached tenders")
+    has_bulletin: bool = Field(description="Whether a bulletin is cached")
+    bulletin_length: int = Field(description="Length of the cached bulletin text")

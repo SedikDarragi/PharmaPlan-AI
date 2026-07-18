@@ -5,6 +5,7 @@ import FactoryCatalog from "./components/FactoryCatalog";
 import DeficitFeed from "./components/DeficitFeed";
 import BeforeAfterComparison from "./components/BeforeAfterComparison";
 import MoleculeDetailDrawer from "./components/MoleculeDetailDrawer";
+import ActivityFeed from "./components/ActivityFeed";
 
 /* ── Header ─────────────────────────────────────────────────────────── */
 
@@ -177,6 +178,22 @@ export default function App() {
   const [selectedMolecule, setSelectedMolecule] = useState(null);
   const [selectedShortage, setSelectedShortage] = useState(null);
 
+  // Activity feed
+  const [activities, setActivities] = useState([]);
+  const activityId = useRef(0);
+
+  const addActivity = useCallback((type, description, color) => {
+    activityId.current += 1;
+    const event = {
+      id: activityId.current,
+      type,
+      description,
+      color: color || "#0ea5e9",
+      timestamp: Date.now(),
+    };
+    setActivities((prev) => [...prev, event]);
+  }, []);
+
   // Quick Demo
   const [isDemoRunning, setIsDemoRunning] = useState(false);
   const demoInFlight = useRef(false);
@@ -186,7 +203,10 @@ export default function App() {
     let cancelled = false;
     fetchInventory()
       .then((data) => {
-        if (!cancelled) setInventory(data);
+        if (!cancelled) {
+          setInventory(data);
+          addActivity("inventory", `Factory catalogue loaded (${data.length} molecules)`);
+        }
       })
       .catch((err) => {
         if (!cancelled) {
@@ -211,6 +231,22 @@ export default function App() {
     setOptimizationResult(null);
   }, []);
 
+  /* ── Circular processed (called from DeficitFeed via onShortagesUpdate signal) ── */
+  const handleCircularProcessed = useCallback(
+    (items, dataSource, provider) => {
+      const src = dataSource === "live" ? "Live (OpenFDA)" : "Mock";
+      const prov = provider || "env default";
+      addActivity(
+        "rag",
+        `RAG processed ${src} circular via ${prov} — ${items.length} shortage${
+          items.length !== 1 ? "s" : ""
+        } found`,
+        dataSource === "live" ? "#10b981" : "#f59e0b"
+      );
+    },
+    [addActivity]
+  );
+
   /* ── Molecule selection handler ──────────────────────────────────── */
   const handleSelectMolecule = useCallback((molecule, shortageInfo) => {
     // When clicking from deficit feed, molecule may be missing factory fields.
@@ -224,7 +260,8 @@ export default function App() {
     }
     setSelectedMolecule(enriched);
     setSelectedShortage(shortageInfo || null);
-  }, [inventory]);
+    addActivity("molecule", `Inspected ${molecule.molecule_name} details`, "#a78bfa");
+  }, [inventory, addActivity]);
 
   const handleCloseDrawer = useCallback(() => {
     setSelectedMolecule(null);
@@ -264,6 +301,15 @@ export default function App() {
       );
       setOptimizationResult(result);
       setIsOptimized(true);
+      addActivity(
+        "optimize",
+        `AI optimisation complete — captured ${new Intl.NumberFormat("en-US", {
+          style: "currency",
+          currency: "USD",
+          maximumFractionDigits: 0,
+        }).format(result.summary.captured_revenue)}`,
+        "#10b981"
+      );
     } catch (err) {
       console.error("Optimisation failed:", err);
       // In a live demo/pitch, the backend has a mock fallback,
@@ -305,6 +351,11 @@ export default function App() {
       );
       setOptimizationResult(optResult);
       setIsOptimized(true);
+      addActivity(
+        "demo",
+        `Quick demo complete — full pipeline executed`,
+        "#0ea5e9"
+      );
     } catch (err) {
       console.error("Quick demo failed:", err);
     } finally {
@@ -373,8 +424,13 @@ export default function App() {
         />
 
         {/* ── Module C: Live National Deficit Feed ────────────────────── */}
+        {/* ── Activity Feed ─────────────────────────────────────────── */}
+        <ActivityFeed events={activities} />
+
+        {/* ── Module C: Live National Deficit Feed ────────────────────── */}
         <DeficitFeed
           onShortagesUpdate={handleShortagesUpdate}
+          onCircularProcessed={handleCircularProcessed}
           llmProvider={llmProvider}
           onSelectMolecule={handleSelectMolecule}
         />
