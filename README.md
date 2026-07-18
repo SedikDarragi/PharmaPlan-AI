@@ -8,7 +8,6 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=white)](https://react.dev)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3-06B6D4?logo=tailwindcss&logoColor=white)](https://tailwindcss.com)
-[![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
 
 ---
 
@@ -341,10 +340,6 @@ Each match goes through **alias resolution** — drug variants like `"Glucophage
 ### Connecting a Real Database
 
 The factory catalogue lives in `app/models/database.py` as an in-memory list. Replace with SQLite/Postgres by swapping the module to query your database and returning the same `list[ActiveMolecule]` format.
-
-## 📝 License
-
-MIT — see [LICENSE](LICENSE) for details.
 
 ---
 
