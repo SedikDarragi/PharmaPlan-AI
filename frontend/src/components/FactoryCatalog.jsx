@@ -55,7 +55,7 @@ function StatusBadge({ available }) {
 
 /* ── Table ─────────────────────────────────────────────────────────── */
 
-export default function FactoryCatalog({ inventory, isLoading, error }) {
+export default function FactoryCatalog({ inventory, isLoading, error, onSelectMolecule, shortageMap }) {
   /* ── Error state ──────────────────────────────────────────────────── */
   if (error) {
     return (
@@ -123,8 +123,11 @@ export default function FactoryCatalog({ inventory, isLoading, error }) {
             {inventory.map((item, i) => (
               <tr
                 key={item.molecule_name}
-                className="transition-colors hover:bg-surface-hover/50"
+                className={`transition-colors cursor-pointer ${
+                  onSelectMolecule ? "hover:bg-surface-hover/70" : "hover:bg-surface-hover/50"
+                }`}
                 style={{ animationDelay: `${i * 30}ms` }}
+                onClick={() => onSelectMolecule && onSelectMolecule(item, shortageMap?.[item.molecule_name])}
               >
                 <td className="px-5 py-3 font-medium text-text-primary">
                   {item.molecule_name}

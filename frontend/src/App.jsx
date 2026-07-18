@@ -4,6 +4,7 @@ import KpiCards from "./components/KpiCards";
 import FactoryCatalog from "./components/FactoryCatalog";
 import DeficitFeed from "./components/DeficitFeed";
 import BeforeAfterComparison from "./components/BeforeAfterComparison";
+import MoleculeDetailDrawer from "./components/MoleculeDetailDrawer";
 
 /* ── Header ─────────────────────────────────────────────────────────── */
 
@@ -172,6 +173,10 @@ export default function App() {
   // LLM Provider (local override for the RAG pipeline)
   const [llmProvider, setLlmProvider] = useState("");
 
+  // Molecule detail drawer
+  const [selectedMolecule, setSelectedMolecule] = useState(null);
+  const [selectedShortage, setSelectedShortage] = useState(null);
+
   // Quick Demo
   const [isDemoRunning, setIsDemoRunning] = useState(false);
   const demoInFlight = useRef(false);
@@ -205,6 +210,43 @@ export default function App() {
     setIsOptimized(false);
     setOptimizationResult(null);
   }, []);
+
+  /* ── Molecule selection handler ──────────────────────────────────── */
+  const handleSelectMolecule = useCallback((molecule, shortageInfo) => {
+    // When clicking from deficit feed, molecule may be missing factory fields.
+    // Merge with inventory data to ensure the drawer shows complete stats.
+    let enriched = molecule;
+    if (!molecule.max_monthly_box_capacity || !molecule.active_dosage) {
+      const match = inventory.find((i) => i.molecule_name === molecule.molecule_name);
+      if (match) {
+        enriched = { ...match, ...molecule };
+      }
+    }
+    setSelectedMolecule(enriched);
+    setSelectedShortage(shortageInfo || null);
+  }, [inventory]);
+
+  const handleCloseDrawer = useCallback(() => {
+    setSelectedMolecule(null);
+    setSelectedShortage(null);
+  }, []);
+
+  /* ── Build shortage map for catalog rows ──────────────────────────── */
+  const shortageMap = React.useMemo(() => {
+    const map = {};
+    shortages.forEach((s) => {
+      map[s.molecule_key] = s;
+    });
+    return map;
+  }, [shortages]);
+
+  /* ---- Optimization info lookup for drawer ---- */
+  const selectedOptimization = React.useMemo(() => {
+    if (!selectedMolecule || !optimizationResult?.allocations) return null;
+    return optimizationResult.allocations.find(
+      (a) => a.molecule_key === selectedMolecule.molecule_name
+    ) || null;
+  }, [selectedMolecule, optimizationResult]);
 
   /* ── Optimize CTA ─────────────────────────────────────────────────── */
   const handleOptimize = useCallback(async () => {
@@ -326,14 +368,25 @@ export default function App() {
           }
           isLoading={isLoading}
           error={inventoryError}
+          onSelectMolecule={handleSelectMolecule}
+          shortageMap={shortageMap}
         />
 
         {/* ── Module C: Live National Deficit Feed ────────────────────── */}
         <DeficitFeed
           onShortagesUpdate={handleShortagesUpdate}
           llmProvider={llmProvider}
+          onSelectMolecule={handleSelectMolecule}
         />
       </main>
+
+      {/* ── Molecule Detail Drawer ──────────────────────────────────── */}
+      <MoleculeDetailDrawer
+        molecule={selectedMolecule}
+        shortageInfo={selectedShortage}
+        optimizationInfo={selectedOptimization}
+        onClose={handleCloseDrawer}
+      />
 
       <Footer />
     </div>

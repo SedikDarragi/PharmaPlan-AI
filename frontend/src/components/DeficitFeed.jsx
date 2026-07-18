@@ -22,13 +22,27 @@ function PriorityBadge({ score }) {
 
 /* ── Single shortage row ───────────────────────────────────────────── */
 
-function ShortageRow({ item, index, moleculeNames }) {
+function ShortageRow({ item, index, moleculeNames, onSelect }) {
   const formatNum = (n) => new Intl.NumberFormat("en-US").format(n);
   const match = moleculeNames.find((m) => m === item.molecule_key);
 
+  const handleClick = () => {
+    if (onSelect) {
+      onSelect({
+        molecule_name: item.molecule_key,
+        variant_found_in_text: item.variant_found_in_text,
+        volume_deficit: item.volume_deficit,
+        priority_score: item.priority_score,
+      }, item);
+    }
+  };
+
   return (
     <div
-      className="feed-item flex items-center gap-3 rounded-lg bg-surface-light/40 px-4 py-3 transition-colors hover:bg-surface-light/70"
+      onClick={handleClick}
+      className={`feed-item flex items-center gap-3 rounded-lg px-4 py-3 transition-colors ${
+        onSelect ? "cursor-pointer hover:bg-surface-light/80" : "bg-surface-light/40 hover:bg-surface-light/70"
+      }`}
       style={{ animationDelay: `${index * 50}ms` }}
     >
       <div className="flex-1 min-w-0">
@@ -63,7 +77,7 @@ function ShortageRow({ item, index, moleculeNames }) {
 
 /* ── Feed component ────────────────────────────────────────────────── */
 
-export default function DeficitFeed({ onShortagesUpdate, llmProvider }) {
+export default function DeficitFeed({ onShortagesUpdate, llmProvider, onSelectMolecule }) {
   const [circularText, setCircularText] = useState(null);
   const [shortages, setShortages] = useState([]);
   const [loading, setLoading] = useState({
@@ -297,6 +311,7 @@ export default function DeficitFeed({ onShortagesUpdate, llmProvider }) {
                 item={item}
                 index={i}
                 moleculeNames={moleculeNames}
+                onSelect={onSelectMolecule}
               />
             ))}
           </div>
