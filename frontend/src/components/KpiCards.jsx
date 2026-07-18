@@ -1,14 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
+import CapacityGauge from "./CapacityGauge";
 
 /* ── Icons ──────────────────────────────────────────────────────────── */
-
-const GaugeIcon = () => (
-  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M12 2a10 10 0 1 0 10 10" />
-    <path d="M12 12 17 7" />
-    <circle cx="12" cy="12" r="2" />
-  </svg>
-);
 
 const AlertIcon = () => (
   <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -176,27 +169,16 @@ export default function KpiCards({
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-      {/* 1. Capacity Load */}
-      <KpiCard
-        icon={<GaugeIcon />}
-        label="Plant Line Capacity Load"
-        value={
-          isLoading
-            ? "—"
-            : isOptimized
-            ? `${capAnim}%`
-            : `${baselineCapacity}%`
-        }
-        sublabel={
-          isOptimized
-            ? `Optimised from ${optSummary.overall_capacity_load_before ?? baselineCapacity}%`
-            : baselineCapacity < 70
-            ? "Under-utilised — run AI optimisation"
-            : "Healthy utilisation"
-        }
-        accentColor={isOptimized ? "#14b8a6" : "#0ea5e9"}
-        isLoading={isLoading}
-      />
+      {/* 1. Capacity Load — donut gauge */}
+      <div className="glass-panel rounded-xl px-5 py-4 flex items-center justify-center transition-all duration-200 hover:border-slate-600/80 hover:shadow-lg hover:shadow-black/20 md:col-span-1">
+        <CapacityGauge
+          percentage={isOptimized ? capAnim : baselineCapacity}
+          previousPercentage={
+            isOptimized ? (optSummary.overall_capacity_load_before ?? baselineCapacity) : undefined
+          }
+          isLoading={isLoading}
+        />
+      </div>
 
       {/* 2. Shortage Matches */}
       <KpiCard
