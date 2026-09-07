@@ -2,7 +2,9 @@
  * PharmaPlan AI — API client.
  *
  * Centralised fetch wrappers for every backend endpoint.
- * All calls go through the Vite proxy (/api → http://localhost:8000/api).
+ * - Development: Vite proxy routes /api → localhost:8000
+ * - Production:  relative /api calls go to the same origin;
+ *                 Vercel rewrites proxy /api → Render backend
  */
 
 const BASE = "/api";

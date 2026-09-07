@@ -4,9 +4,10 @@ PharmaPlan AI — Backend entry point.
 Usage
 -----
     uvicorn main:app --reload          # development
-    uvicorn main:app --host 0.0.0.0    # production-ready
+    gunicorn main:app -w 4             # production (Render, etc.)
 """
 
+import os
 import uvicorn
 
 from app.core.config import create_app
@@ -17,4 +18,5 @@ app.include_router(router)
 
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    port = int(os.getenv("PORT", 8000))
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)
