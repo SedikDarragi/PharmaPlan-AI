@@ -2,6 +2,11 @@
 
 # PharmaPlan AI
 
+<p align="center">
+  <img src="demo.png" alt="My Image" width="800">
+</p>
+
+
 **Executive Factory Intelligence Dashboard for Pharmaceutical Manufacturers**
 
 [![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)](https://python.org)
