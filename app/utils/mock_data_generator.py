@@ -170,10 +170,16 @@ def _generate_bulletin(seed: int = 42) -> str:
         # Always use the variant name here to force alias resolution
         alias = rng.choice(_VARIANTS[canon])
         shortfall = rng.randint(10_000, 150_000)
+        motifs = [
+            "Defaut de fabrication",
+            "Retard de livraison",
+            "Non-conformite",
+            "Absence d'offre",
+        ]
         paragraphs.append(
             f"POSTE N° {rng.randint(100, 999)}:  {alias.upper()}  --  "
             f"QUANTITE NON SERVIE : {shortfall:,} unites  "
-            f"| Motif : {rng.choice(['Defaut de fabrication', 'Retard de livraison', 'Non-conformite', 'Absence d\'offre'])}"
+            f"| Motif : {rng.choice(motifs)}"
         )
 
     # ── Footer noise ──────────────────────────────────────────────────────
